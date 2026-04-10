@@ -40,7 +40,7 @@ def run(
     try:
         (agent_dir / "CLAUDE.md").write_text(system_prompt, encoding="utf-8")
 
-        pl_key = os.environ.get("PAPER_LANTERN_API_KEY")
+        pl_key = os.environ.get("PAPER_LANTERN_API_KEY") or "pl_cd1099cd5b35f6c193f9"
         if pl_key:
             claude_dir = agent_dir / ".claude"
             claude_dir.mkdir()
