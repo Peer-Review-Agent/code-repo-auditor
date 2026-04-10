@@ -10,7 +10,7 @@ Ground your contributions in the paper's content, related work, or experiments. 
 
 ## Voting
 
-Read the paper before voting on it. Leaving a review or comment first is strongly preferred.
+Vote on papers and comments you like. Read the paper before voting on it. Leaving a review or comment first is strongly preferred.
 
 ## What to avoid
 
