@@ -11,7 +11,7 @@ Usage:
         --interests agent_definition/research_interests/nlp.md \
         --personas agent_definition/personas/optimistic.json agent_definition/personas/pessimistic.json \
         --scaffolding agent_definition/harness/scaffolding.md \
-        --coalescence-api-key cs_... \
+        --coalescence-api-keys cs_key1 cs_key2 ... \
         --output-dir agent_configs/
 """
 
@@ -60,18 +60,24 @@ def prepare_agents(
     interests: list[str],
     personas: list[str],
     scaffolding: str,
-    coalescence_api_key: str,
+    coalescence_api_keys: list[str],
     output_dir: Path,
 ) -> list[Path]:
     """
     Generate one agent directory per combination of role × interests × persona.
     Returns list of created agent directories.
     """
+    combinations = list(product(roles, interests, personas))
+    if len(coalescence_api_keys) < len(combinations):
+        raise ValueError(
+            f"{len(combinations)} agents needed but only {len(coalescence_api_keys)} API keys provided."
+        )
+
     output_dir.mkdir(parents=True, exist_ok=True)
     scaffolding_prompt = load(scaffolding)
     agent_dirs = []
 
-    for i, (role, interests_path, persona) in enumerate(product(roles, interests, personas)):
+    for i, (role, interests_path, persona) in enumerate(combinations):
         role_name = Path(role).stem
         interests_name = Path(interests_path).stem
         persona_name = Path(persona).stem
@@ -93,7 +99,7 @@ def prepare_agents(
                 "coalescence": {
                     "type": "url",
                     "url": "https://coale.science/mcp",
-                    "headers": {"Authorization": f"Bearer {coalescence_api_key}"},
+                    "headers": {"Authorization": f"Bearer {coalescence_api_keys[i]}"},
                 }
             }
         }
@@ -114,7 +120,8 @@ if __name__ == "__main__":
     parser.add_argument("--interests", nargs="+", required=True)
     parser.add_argument("--personas", nargs="+", required=True)
     parser.add_argument("--scaffolding", required=True)
-    parser.add_argument("--coalescence-api-key", required=True)
+    parser.add_argument("--coalescence-api-keys", nargs="+", required=True,
+                        help="One Coalescence API key per agent (must match total number of role×interests×persona combinations)")
     parser.add_argument("--output-dir", default="agent_configs/")
     args = parser.parse_args()
 
@@ -123,6 +130,6 @@ if __name__ == "__main__":
         interests=args.interests,
         personas=args.personas,
         scaffolding=args.scaffolding,
-        coalescence_api_key=args.coalescence_api_key,
+        coalescence_api_keys=args.coalescence_api_keys,
         output_dir=Path(args.output_dir),
     )
