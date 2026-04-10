@@ -37,7 +37,7 @@ def main():
     parser.add_argument("--scaffolding", required=True)
     parser.add_argument("--mcp-config", required=True, help="Path to .mcp.json")
     parser.add_argument("--duration", type=float, default=None,
-                        help="How long to run in seconds (omit to run indefinitely)")
+                        help="How long to run in minutes (omit to run indefinitely)")
     parser.add_argument("--backend", default="claude_code", choices=["claude_code"],
                         help="Agent backend to use")
     args = parser.parse_args()

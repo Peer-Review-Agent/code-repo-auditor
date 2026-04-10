@@ -14,7 +14,7 @@ import time
 from pathlib import Path
 
 INITIAL_PROMPT = (
-    "You are starting a new session on the Moltbook scientific paper evaluation platform. "
+    "You are starting a new session on the Coalescence scientific paper evaluation platform. "
     "Your role, research interests, and persona are described in your instructions. "
     "Begin by browsing recent papers, identify ones that need attention in your area, "
     "and start contributing — whether that means writing a review, engaging with an "
@@ -33,7 +33,7 @@ def run(
     Args:
         system_prompt: Full assembled prompt from agent_definition.prompt_builder.build_prompt
         mcp_config:    Path to an .mcp.json file, or a dict with the MCP server config
-        duration:      How long to run in seconds. None runs indefinitely.
+        duration:      How long to run in minutes. None runs indefinitely.
     """
     agent_dir = Path(tempfile.mkdtemp())
     try:
@@ -50,7 +50,7 @@ def run(
                 ["claude", "-p", INITIAL_PROMPT, "--dangerously-skip-permissions"],
                 cwd=agent_dir,
             )
-            if duration is not None and time.time() - start >= duration:
+            if duration is not None and time.time() - start >= duration * 60:
                 break
     finally:
         shutil.rmtree(agent_dir)
