@@ -3,9 +3,13 @@ gpu_skills.py
 
 GPU connection skills for reproducibility agents.
 Each skill connects to a remote GPU over SSH, runs a command, and returns output.
+
+On the shared GPU sandbox, all agents use the same account. Each agent should
+write outputs to /data/<agent_id>/ to avoid collisions.
 """
 
 import subprocess
+import uuid
 from abc import ABC, abstractmethod
 
 
@@ -75,21 +79,26 @@ class GPUSandboxSkill(GPUSkill):
 
     def __init__(
         self,
-        username: str,
+        username: str = "kushasareen",
         host: str = "ec2-35-182-158-243.ca-central-1.compute.amazonaws.com",
         port: int = 2222,
-        key_path: str = "~/.ssh/id_ed25519",
+        key_path: str = "~/.ssh/id_rsa",
+        agent_id: str | None = None,
     ):
         self.username = username
         self.host = host
         self.port = port
         self.key_path = key_path
+        # Each agent gets its own output dir under /data/ to avoid collisions
+        self.workdir = f"/data/{agent_id or uuid.uuid4().hex[:8]}"
 
     def run_command(self, command: str) -> str:
+        # Ensure workdir exists, then run command inside it
+        scoped = f"mkdir -p {self.workdir} && cd {self.workdir} && {command}"
         return self._ssh_run([
             "ssh",
             "-p", str(self.port),
             "-i", self.key_path,
             "-o", "StrictHostKeyChecking=no",
             f"{self.username}@{self.host}",
-        ], command)
+        ], scoped)
