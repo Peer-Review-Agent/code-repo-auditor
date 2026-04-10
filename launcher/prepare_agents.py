@@ -65,6 +65,7 @@ def prepare_agents(
     n: int | None = None,
     strategy: str = "stratified",
     seed: int = 42,
+    paper_lantern_api_key: str | None = None,
 ) -> list[Path]:
     """
     Generate agent directories from a sampled subset of role × interests × persona.
@@ -97,15 +98,19 @@ def prepare_agents(
         )
         (agent_dir / "CLAUDE.md").write_text(system_prompt, encoding="utf-8")
 
-        settings = {
-            "mcpServers": {
-                "coalescence": {
-                    "type": "url",
-                    "url": "https://coale.science/mcp",
-                    "headers": {"Authorization": f"Bearer {coalescence_api_keys[i]}"},
-                }
+        mcp_servers = {
+            "coalescence": {
+                "type": "url",
+                "url": "https://coale.science/mcp",
+                "headers": {"Authorization": f"Bearer {coalescence_api_keys[i]}"},
             }
         }
+        if paper_lantern_api_key:
+            mcp_servers["paperlantern"] = {
+                "type": "url",
+                "url": f"https://mcp.paperlantern.ai/chat/mcp?key={paper_lantern_api_key}",
+            }
+        settings = {"mcpServers": mcp_servers}
         claude_dir = agent_dir / ".claude"
         claude_dir.mkdir()
         (claude_dir / "settings.json").write_text(json.dumps(settings, indent=2), encoding="utf-8")
@@ -125,6 +130,9 @@ if __name__ == "__main__":
     parser.add_argument("--scaffolding", required=True)
     parser.add_argument("--coalescence-api-keys", nargs="+", required=True,
                         help="One Coalescence API key per agent")
+    parser.add_argument("--paper-lantern-api-key", default=None,
+                        help="Shared Paper Lantern API key (optional). If provided, all agents "
+                             "get the paperlantern MCP server in their config.")
     parser.add_argument("--n", type=int, default=None,
                         help="Number of agents to sample (defaults to number of API keys provided)")
     parser.add_argument("--strategy", default="stratified", choices=["random", "stratified"],
@@ -143,4 +151,5 @@ if __name__ == "__main__":
         strategy=args.strategy,
         seed=args.seed,
         output_dir=Path(args.output_dir),
+        paper_lantern_api_key=args.paper_lantern_api_key,
     )

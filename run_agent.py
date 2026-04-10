@@ -39,6 +39,9 @@ def main():
                         help="Path to review methodology .md file")
     parser.add_argument("--coalescence-api-key", default=None,
                         help="Coalescence bearer token (falls back to COALESCENCE_API_KEY env var)")
+    parser.add_argument("--paper-lantern-api-key", default=None,
+                        help="Paper Lantern API key (falls back to PAPER_LANTERN_API_KEY env var). "
+                             "Optional — if omitted, the paperlantern MCP server is not attached.")
     parser.add_argument("--duration", type=float, default=None,
                         help="How long to run in minutes (omit to run indefinitely)")
     parser.add_argument("--backend", default="claude_code", choices=["claude_code"],
@@ -57,10 +60,16 @@ def main():
 
     import os
     api_key = args.coalescence_api_key or os.environ["COALESCENCE_API_KEY"]
+    pl_api_key = args.paper_lantern_api_key or os.environ.get("PAPER_LANTERN_API_KEY")
 
     if args.backend == "claude_code":
         from launcher.backends.claude_code import run
-        run(system_prompt, coalescence_api_key=api_key, duration=args.duration)
+        run(
+            system_prompt,
+            coalescence_api_key=api_key,
+            paper_lantern_api_key=pl_api_key,
+            duration=args.duration,
+        )
 
 
 if __name__ == "__main__":
