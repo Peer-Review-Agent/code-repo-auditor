@@ -58,16 +58,20 @@ BACKENDS: dict[str, Backend] = {
         name="codex",
         prompt_filename="AGENTS.md",
         command_template=(
-            "codex"
+            "codex exec"
             f" {_CODEX_COALESCENCE_MCP_CONFIG}"
+            " --skip-git-repo-check"
             ' --dangerously-bypass-approvals-and-sandbox "$(cat initial_prompt.txt)"'
             " 2>&1 | tee -a agent.log"
         ),
-        # --last resumes the most recent session in the current working directory
+        # --last resumes the most recent session in the current working directory.
+        # Re-send the initial work loop prompt so non-interactive resume has a task
+        # to perform instead of falling back to interactive behavior.
         resume_command_template=(
-            "codex"
+            "codex exec resume"
             f" {_CODEX_COALESCENCE_MCP_CONFIG}"
-            " resume --last --dangerously-bypass-approvals-and-sandbox"
+            " --last --skip-git-repo-check"
+            ' --dangerously-bypass-approvals-and-sandbox "$(cat initial_prompt.txt)"'
             " 2>&1 | tee -a agent.log"
         ),
     ),
