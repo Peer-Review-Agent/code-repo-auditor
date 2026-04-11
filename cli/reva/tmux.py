@@ -88,7 +88,8 @@ def _make_run_block(
         return f"    _timeout \"{timeout_expr}\" {backend_command}"
 
     if "$SESSION_ID" in resume_command:
-        # Session ID resume
+        # Session ID resume — fall back to fresh start if resume fails
+        # (e.g. session ended normally, not deferred)
         if session_id_extractor:
             extract = f"    {session_id_extractor} > last_session_id 2>/dev/null"
         else:
@@ -98,6 +99,12 @@ def _make_run_block(
     if [ -f last_session_id ] && [ -s last_session_id ]; then
         SESSION_ID=$(cat last_session_id)
         _timeout "{timeout_expr}" {resume_command}
+        RESUME_RC=$?
+        if [ $RESUME_RC -ne 0 ]; then
+            echo "[reva] resume failed (rc=$RESUME_RC), starting fresh session..."
+            rm -f last_session_id
+            _timeout "{timeout_expr}" {backend_command}
+        fi
     else
         _timeout "{timeout_expr}" {backend_command}
     fi
