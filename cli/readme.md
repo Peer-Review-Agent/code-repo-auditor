@@ -5,17 +5,17 @@
 Three commands to go from nothing to a live agent:
 
 ```bash
-uv run reva batch create     # sample 1 random agent (wipes old ones automatically)
+uv run reva batch create     # sample 1 random agent
 uv run reva batch launch     # launch it indefinitely
 uv run reva watch            # watch it work in real time
 ```
 
 All arguments default — roles, interests, and personas are picked up from paths in `config.toml`, one agent is sampled at random, and duration is indefinite.
 
-Keep existing agents and add more with `--no-clean`:
+Wipe existing agents and start fresh with `--clean`:
 
 ```bash
-uv run reva batch create --no-clean --n 5
+uv run reva batch create --clean --n 5
 ```
 
 ## Setup
@@ -45,11 +45,14 @@ Config resolution order (first match wins):
 ## Batch operations
 
 ```bash
-# defaults: n=1, random sampling, auto-wipe existing agents
+# defaults: n=1, random sampling, keeps existing agents
 reva batch create
 
-# larger batch, stratified, keep existing agents
-reva batch create --n 50 --strategy stratified --no-clean
+# wipe existing agents and start fresh
+reva batch create --clean
+
+# larger batch, stratified
+reva batch create --n 50 --strategy stratified
 
 # launch all agents in parallel (indefinite by default)
 reva batch launch

@@ -9,17 +9,17 @@ The goal is to build a population of heterogeneous reviewing agents that interac
 Three commands to go from nothing to a live agent:
 
 ```bash
-uv run reva batch create     # sample 1 random agent (wipes old ones automatically)
+uv run reva batch create     # sample 1 random agent
 uv run reva batch launch     # launch it indefinitely
 uv run reva watch            # watch it work in real time
 ```
 
-That's it. All arguments default — roles, interests, personas are picked from `agent_definition/`, one agent is sampled at random, duration is indefinite.
+All arguments default — roles, interests, personas are picked from `agent_definition/`, one agent is sampled at random, duration is indefinite.
 
-Keep existing agents with `--no-clean`:
+Wipe existing agents before creating with `--clean`:
 
 ```bash
-uv run reva batch create --no-clean --n 5    # add 5 more without wiping
+uv run reva batch create --clean --n 5    # kill old agents and start fresh
 ```
 
 ## Setup
@@ -85,11 +85,14 @@ uv run reva debug --n 3 --strategy stratified
 ### Create a batch of agents
 
 ```bash
-# defaults: n=1, random sampling, auto-wipe existing agents
+# defaults: n=1, random sampling, keeps existing agents
 uv run reva batch create
 
-# larger batch, keep what's already there
-uv run reva batch create --n 50 --strategy stratified --no-clean
+# wipe existing agents and start fresh
+uv run reva batch create --clean
+
+# larger batch, stratified
+uv run reva batch create --n 50 --strategy stratified
 ```
 
 ### Launch all agents

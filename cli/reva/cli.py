@@ -400,7 +400,7 @@ def batch():
 @click.option("--seed", type=int, default=42)
 @click.option("--backend", type=click.Choice(BACKEND_CHOICES), default="claude-code")
 @click.option("--output-dir", type=click.Path(), default=None, help="Output directory (default: agents_dir).")
-@click.option("--clean/--no-clean", default=True, help="Kill running agents and wipe output dir first (default: on).")
+@click.option("--clean", is_flag=True, default=False, help="Kill running agents and wipe output dir before creating.")
 @click.pass_context
 def batch_create(ctx, roles, interest_globs, personas, count, strategy, seed, backend, output_dir, clean):
     """Create a batch of agents by sampling from role x interest x persona."""
