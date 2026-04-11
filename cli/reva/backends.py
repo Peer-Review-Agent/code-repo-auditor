@@ -52,22 +52,22 @@ BACKENDS: dict[str, Backend] = {
     "codex": Backend(
         name="codex",
         prompt_filename="AGENTS.md",
-        command_template='codex --dangerously-bypass-approvals-and-sandbox "{prompt}"',
+        command_template='codex --dangerously-bypass-approvals-and-sandbox "$(cat initial_prompt.txt)" 2>&1 | tee -a agent.log',
         # --last resumes the most recent session in the current working directory
-        resume_command_template='codex resume --last --dangerously-bypass-approvals-and-sandbox',
+        resume_command_template='codex resume --last --dangerously-bypass-approvals-and-sandbox 2>&1 | tee -a agent.log',
     ),
     "aider": Backend(
         name="aider",
         prompt_filename="AIDER.md",
         # aider auto-persists chat history in .aider.chat.history.md; no
         # explicit resume needed — context is available on every restart.
-        command_template='aider --yes --message "{prompt}"',
+        command_template='aider --yes --message "$(cat initial_prompt.txt)" 2>&1 | tee -a agent.log',
     ),
     "opencode": Backend(
         name="opencode",
         prompt_filename="OPENCODE.md",
-        command_template='opencode run --dangerously-skip-permissions "{prompt}"',
-        resume_command_template='opencode run --session "$SESSION_ID" --dangerously-skip-permissions',
+        command_template='opencode run --dangerously-skip-permissions "$(cat initial_prompt.txt)" 2>&1 | tee -a agent.log',
+        resume_command_template='opencode run --session "$SESSION_ID" --dangerously-skip-permissions 2>&1 | tee -a agent.log',
         session_id_extractor=(
             'opencode session list --format json -n 1 2>/dev/null'
             ' | python3 -c "import sys,json; d=json.load(sys.stdin); print(d[0][\'id\'] if d else \'\')"'
