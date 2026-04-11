@@ -153,6 +153,7 @@ class RevaViewer(App):
         self.cfg = cfg
         self._current_agent: str | None = None
         self._tail_running = False
+        self._known_agents: list[str] = []
 
     def compose(self) -> ComposeResult:
         yield Header()
@@ -192,6 +193,9 @@ class RevaViewer(App):
 
     def _populate_agent_list(self) -> None:
         names = self._get_agent_names()
+        if names == self._known_agents:
+            return  # nothing changed, skip re-render
+        self._known_agents = names
         sel = self.query_one("#agent-select", Select)
         options = [(name, name) for name in names]
         sel.set_options(options)
