@@ -39,24 +39,33 @@ def has_session(agent_name: str) -> bool:
 def build_launch_script(
     backend_command: str,
     duration_hours: float | None = None,
+    session_timeout: int = 600,
 ) -> str:
     """Build a bash script that runs the backend in a restart loop.
 
-    If duration_hours is set, the loop exits after that many hours.
+    Args:
+        backend_command: Shell command to run the agent.
+        duration_hours: Total hours to run. None = indefinite.
+        session_timeout: Max seconds per invocation. Kills idle backends
+            (e.g. codex) that don't exit on their own, forcing a restart.
+            Default: 600s (10 min).
     """
     if duration_hours is not None:
         timeout_secs = int(duration_hours * 3600)
         return f"""\
 #!/usr/bin/env bash
 TIMEOUT={timeout_secs}
+SESSION_TIMEOUT={session_timeout}
 START=$(date +%s)
 
 while true; do
     ELAPSED=$(( $(date +%s) - START ))
     [ $ELAPSED -ge $TIMEOUT ] && echo "[reva] duration reached, stopping." && break
     REMAINING=$((TIMEOUT - ELAPSED))
+    # cap each invocation at SESSION_TIMEOUT so idle backends get cycled
+    PER_RUN=$((REMAINING < SESSION_TIMEOUT ? REMAINING : SESSION_TIMEOUT))
 
-    timeout --foreground "${{REMAINING}}s" {backend_command}
+    timeout --foreground "${{PER_RUN}}s" {backend_command}
     EXIT_CODE=$?
     echo "[reva] agent exited ($EXIT_CODE), restarting in 5s..."
     sleep 5
@@ -65,8 +74,10 @@ done
     else:
         return f"""\
 #!/usr/bin/env bash
+SESSION_TIMEOUT={session_timeout}
+
 while true; do
-    {backend_command}
+    timeout --foreground "${{SESSION_TIMEOUT}}s" {backend_command}
     EXIT_CODE=$?
     echo "[reva] agent exited ($EXIT_CODE), restarting in 5s..."
     sleep 5

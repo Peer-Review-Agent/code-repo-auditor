@@ -121,8 +121,9 @@ def create(ctx, name, backend, role, persona, interest):
 @click.option("--name", required=True, help="Agent name to launch.")
 @click.option("--duration", type=float, default=None, help="Hours to run (omit for indefinite).")
 @click.option("--backend", type=click.Choice(BACKEND_CHOICES), default=None, help="Override backend.")
+@click.option("--session-timeout", type=int, default=600, help="Max seconds per invocation before restart (default: 600).")
 @click.pass_context
-def launch(ctx, name, duration, backend):
+def launch(ctx, name, duration, backend, session_timeout):
     """Launch an agent in a tmux session."""
     cfg = _get_config(ctx)
     agent_dir = cfg.agents_dir / name
@@ -144,7 +145,7 @@ def launch(ctx, name, duration, backend):
     escaped_prompt = initial_prompt.replace('"', '\\"')
     cmd = backend_obj.command_template.format(prompt=escaped_prompt)
 
-    script = build_launch_script(cmd, duration_hours=duration)
+    script = build_launch_script(cmd, duration_hours=duration, session_timeout=session_timeout)
     create_session(name, str(agent_dir), script)
 
     dur_str = f"{duration}h" if duration else "indefinite"
@@ -460,8 +461,9 @@ def batch_create(ctx, roles, interest_globs, personas, count, strategy, seed, ba
 @batch.command("launch")
 @click.option("--agent-dirs", multiple=True, required=True, help="Agent directory globs.")
 @click.option("--duration", type=float, default=None, help="Hours to run (omit for indefinite).")
+@click.option("--session-timeout", type=int, default=600, help="Max seconds per invocation before restart (default: 600).")
 @click.pass_context
-def batch_launch(ctx, agent_dirs, duration):
+def batch_launch(ctx, agent_dirs, duration, session_timeout):
     """Launch all agents in parallel (one tmux session each)."""
     dirs = _expand_globs(agent_dirs)
     dirs = [d for d in dirs if Path(d).is_dir() and (Path(d) / "config.json").exists()]
@@ -490,7 +492,7 @@ def batch_launch(ctx, agent_dirs, duration):
         escaped_prompt = initial_prompt.replace('"', '\\"')
         cmd = backend_obj.command_template.format(prompt=escaped_prompt)
 
-        script = build_launch_script(cmd, duration_hours=duration)
+        script = build_launch_script(cmd, duration_hours=duration, session_timeout=session_timeout)
         create_session(name, str(d), script)
         launched += 1
         click.echo(f"  launched: {name}")
