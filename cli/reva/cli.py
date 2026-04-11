@@ -651,7 +651,10 @@ def debug(ctx, count, strategy, seed):
 @click.option("--all", "watch_all", is_flag=True, help="Interleave all running agents.")
 @click.pass_context
 def log(ctx, name, watch_all):
-    """Stream a readable live view of agent activity from agent.log."""
+    """Stream a readable live view of agent activity (ATIF-backed)."""
+    from reva.render import render_step_terminal
+    from reva.session import SessionContext
+
     cfg = _get_config(ctx)
 
     if watch_all:
@@ -677,11 +680,8 @@ def log(ctx, name, watch_all):
         log_files = [(agents[0].name, agents[0] / "agent.log")]
         click.echo(f"Watching: {agents[0].name}\n")
 
-    handles = {name: open(path, "r") for name, path in log_files}
-    # seek to end so we only show new lines (unless file is small)
-    for name_, fh in handles.items():
-        fh.seek(0)
-
+    handles = {n: open(p, "r") for n, p in log_files}
+    contexts = {n: SessionContext.for_agent(cfg.agents_dir / n) for n, _ in log_files}
     prefix = len(log_files) > 1
 
     try:
@@ -692,112 +692,32 @@ def log(ctx, name, watch_all):
                 if not line:
                     continue
                 activity = True
-                _render_log_line(line.strip(), agent_name if prefix else None)
+                sess = contexts[agent_name]
+                for step in sess.consume_lines([line]):
+                    for rendered in render_step_terminal(step, agent_name if prefix else None):
+                        click.echo(rendered)
             if not activity:
+                for sess in contexts.values():
+                    try:
+                        sess.flush()
+                    except Exception:
+                        pass
                 time.sleep(0.2)
     except KeyboardInterrupt:
         pass
     finally:
         for fh in handles.values():
             fh.close()
+        for sess in contexts.values():
+            try:
+                sess.flush()
+            except Exception:
+                pass
 
 
 # hidden alias so `reva watch` still works
 _watch = click.Command(name="watch", callback=log.callback, params=log.params, help=log.help, hidden=True)
 main.add_command(_watch)
-
-
-def _wrap(text: str, width: int = 100, indent: str = "  ") -> str:
-    """Wrap text to width, indenting continuation lines."""
-    import textwrap
-    lines = text.splitlines()
-    wrapped = []
-    for line in lines:
-        wrapped.extend(textwrap.wrap(line, width, subsequent_indent=indent) or [""])
-    return "\n".join(wrapped)
-
-
-def _render_log_line(line: str, agent_name: str | None):
-    """Parse one stream-json line and print a human-readable summary."""
-    if not line:
-        return
-    try:
-        d = json.loads(line)
-    except json.JSONDecodeError:
-        click.echo(line)
-        return
-
-    if not isinstance(d, dict):
-        rendered = json.dumps(d, ensure_ascii=False)
-        click.echo(_wrap(rendered[:2000], indent="  "))
-        return
-
-    tag = f"[{agent_name[:28]}] " if agent_name else ""
-    typ = d.get("type")
-
-    if typ == "system" and d.get("subtype") == "init":
-        model = d.get("model", "?")
-        click.echo(click.style(f"\n{tag}▶ session started  model={model}", fg="green", bold=True))
-
-    elif typ == "assistant":
-        for block in d.get("message", {}).get("content", []):
-            btype = block.get("type")
-
-            if btype == "thinking":
-                thought = block.get("thinking", "").strip()
-                if thought:
-                    click.echo(click.style(f"\n{tag}thinking:", fg="bright_black", bold=True))
-                    click.echo(click.style(_wrap(thought, indent="  "), fg="bright_black"))
-
-            elif btype == "text":
-                text = block.get("text", "").strip()
-                if text:
-                    click.echo(click.style(f"\n{tag}» ", fg="cyan", bold=True) + _wrap(text, indent="  "))
-
-            elif btype == "tool_use":
-                tool = block.get("name", "?")
-                inp = block.get("input", {})
-                summary = _summarize_tool_input(tool, inp)
-                click.echo(click.style(f"\n{tag}⚙ {tool}", fg="yellow", bold=True))
-                if summary:
-                    click.echo(click.style(_wrap(summary, indent="  "), fg="yellow"))
-
-    elif typ == "user":
-        for block in d.get("message", {}).get("content", []):
-            if block.get("type") == "tool_result":
-                result = block.get("content", "")
-                if isinstance(result, list):
-                    result = " ".join(r.get("text", "") for r in result if isinstance(r, dict))
-                if result and result.strip():
-                    click.echo(click.style(f"  ← ", fg="bright_black") +
-                               click.style(_wrap(result.strip(), indent="    "), fg="bright_black"))
-
-    elif typ == "result":
-        cost = d.get("cost_usd")
-        turns = d.get("num_turns")
-        cost_str = f"  cost=${cost:.4f}" if cost else ""
-        click.echo(click.style(f"\n{tag}■ session ended  turns={turns}{cost_str}\n", fg="red", bold=True))
-
-    elif typ == "rate_limit_event":
-        status = d.get("rate_limit_info", {}).get("status", "?")
-        if status != "allowed":
-            click.echo(click.style(f"{tag}⚠ rate limit: {status}", fg="magenta"))
-
-
-def _summarize_tool_input(tool: str, inp: dict) -> str:
-    if tool == "Bash":
-        return inp.get("command", "").strip()
-    if tool == "WebFetch":
-        return inp.get("url", "")
-    if tool in ("Write", "Edit"):
-        return inp.get("file_path", "")
-    if tool == "Read":
-        return inp.get("file_path", "")
-    if tool == "Skill":
-        return inp.get("skill", "")
-    if tool in ("Grep", "Glob"):
-        return inp.get("pattern", "") or inp.get("query", "")
-    return json.dumps(inp, ensure_ascii=False)[:200]
 
 
 # --------------------------------------------------------------------------- #
@@ -806,11 +726,20 @@ def _summarize_tool_input(tool: str, inp: dict) -> str:
 
 
 @main.command()
+@click.option("--web", is_flag=True, help="Serve an interactive web UI instead of the TUI.")
+@click.option("--host", default="127.0.0.1", show_default=True, help="Web host (with --web).")
+@click.option("--port", default=8765, show_default=True, type=int, help="Web port (with --web).")
 @click.pass_context
-def view(ctx):
-    """Launch the interactive TUI viewer (dropdown + tabs)."""
-    from reva.viewer import RevaViewer
+def view(ctx, web, host, port):
+    """Launch the interactive ATIF viewer (TUI, or web with --web)."""
     cfg = _get_config(ctx)
+    if web:
+        from reva.web import serve
+
+        serve(cfg, host=host, port=port)
+        return
+    from reva.viewer import RevaViewer
+
     app = RevaViewer(cfg=cfg)
     app.run()
 

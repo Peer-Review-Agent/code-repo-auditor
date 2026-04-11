@@ -1,5 +1,8 @@
 """
 reva view — interactive Textual TUI for watching agent activity.
+
+Rendering is driven by the ATIF trajectory, so backend-specific parsing lives
+in `reva.translators` and visual style lives in `reva.render`.
 """
 
 from __future__ import annotations
@@ -26,134 +29,9 @@ from textual.widgets import (
     TabPane,
 )
 
+from reva.render import render_step_textual
+from reva.session import SessionContext
 from reva.tmux import list_sessions
-
-
-# --------------------------------------------------------------------------- #
-# helpers (adapted from cli.py)
-# --------------------------------------------------------------------------- #
-
-
-def _summarize_tool_input(tool: str, inp: dict) -> str:
-    if tool == "Bash":
-        return inp.get("command", "").strip()
-    if tool == "WebFetch":
-        return inp.get("url", "")
-    if tool in ("Write", "Edit"):
-        return inp.get("file_path", "")
-    if tool == "Read":
-        return inp.get("file_path", "")
-    if tool == "Skill":
-        return inp.get("skill", "")
-    if tool in ("Grep", "Glob"):
-        return inp.get("pattern", "") or inp.get("query", "")
-    return json.dumps(inp, ensure_ascii=False)[:200]
-
-
-# Tool name → color
-_TOOL_COLORS: dict[str, str] = {
-    "Bash": "dark_orange",
-    "Read": "steel_blue",
-    "Write": "medium_orchid",
-    "Edit": "medium_orchid",
-    "WebFetch": "turquoise2",
-    "WebSearch": "turquoise2",
-    "Grep": "khaki1",
-    "Glob": "khaki1",
-    "Skill": "spring_green2",
-}
-
-
-def _parse_log_line(line: str) -> list[Text]:
-    """Parse one stream-json line into Rich Text objects for RichLog."""
-    if not line:
-        return []
-    try:
-        d = json.loads(line)
-    except json.JSONDecodeError:
-        # plain-text log line (e.g. gemini-cli output)
-        t = Text()
-        if line.startswith("[reva]"):
-            t.append(line, style="bold dim")
-        else:
-            t.append(line, style="bright_white")
-        return [t]
-
-    if not isinstance(d, dict):
-        t = Text()
-        rendered = json.dumps(d, ensure_ascii=False)
-        t.append(rendered[:1000], style="color(245)")
-        return [t]
-
-    typ = d.get("type")
-    out: list[Text] = []
-
-    if typ == "system" and d.get("subtype") == "init":
-        model = d.get("model", "?")
-        t = Text()
-        t.append("\n▶ session started  ", style="bold bright_green")
-        t.append(f"model={model}", style="green")
-        out.append(t)
-
-    elif typ == "assistant":
-        for block in d.get("message", {}).get("content", []):
-            btype = block.get("type")
-
-            if btype == "thinking":
-                thought = block.get("thinking", "").strip()
-                if thought:
-                    t = Text()
-                    t.append("\n💭 thinking\n", style="bold color(244)")
-                    t.append(f"   {thought}", style="italic color(240)")
-                    out.append(t)
-
-            elif btype == "text":
-                text = block.get("text", "").strip()
-                if text:
-                    t = Text()
-                    t.append("\n» ", style="bold bright_cyan")
-                    t.append(text, style="bright_white")
-                    out.append(t)
-
-            elif btype == "tool_use":
-                tool = block.get("name", "?")
-                inp = block.get("input", {})
-                summary = _summarize_tool_input(tool, inp)
-                color = _TOOL_COLORS.get(tool, "yellow")
-                t = Text()
-                t.append(f"\n⚙ {tool}", style=f"bold {color}")
-                if summary:
-                    t.append(f"\n  {summary}", style=f"dim {color}")
-                out.append(t)
-
-    elif typ == "user":
-        for block in d.get("message", {}).get("content", []):
-            if block.get("type") == "tool_result":
-                result = block.get("content", "")
-                if isinstance(result, list):
-                    result = " ".join(r.get("text", "") for r in result if isinstance(r, dict))
-                if result and result.strip():
-                    t = Text()
-                    t.append("  ← ", style="dim")
-                    t.append(result.strip()[:400], style="color(245)")
-                    out.append(t)
-
-    elif typ == "result":
-        cost = d.get("cost_usd")
-        turns = d.get("num_turns")
-        cost_str = f"  cost=${cost:.4f}" if cost else ""
-        t = Text()
-        t.append(f"\n■ session ended  turns={turns}{cost_str}\n", style="bold red")
-        out.append(t)
-
-    elif typ == "rate_limit_event":
-        status = d.get("rate_limit_info", {}).get("status", "?")
-        if status != "allowed":
-            t = Text()
-            t.append(f"⚠ rate limit: {status}", style="bold magenta")
-            out.append(t)
-
-    return out
 
 
 # --------------------------------------------------------------------------- #
@@ -201,6 +79,7 @@ class RevaViewer(App):
         self._current_agent: str | None = None
         self._tail_running = False
         self._known_agents: list[str] = []
+        self._session: SessionContext | None = None
 
     def compose(self) -> ComposeResult:
         yield Header()
@@ -280,6 +159,7 @@ class RevaViewer(App):
         log_widget.clear()
         self._tail_running = False
         time.sleep(0.05)
+        self._session = SessionContext.for_agent(agent_dir)
         log_path = agent_dir / "agent.log"
         if log_path.exists():
             self._tail_log(log_path)
@@ -332,14 +212,27 @@ class RevaViewer(App):
     def _tail_log(self, log_path: Path) -> None:
         self._tail_running = True
         log_widget = self.query_one("#output-log", RichLog)
+        session = self._session
+        last_flush = time.time()
         with open(log_path, "r", encoding="utf-8", errors="replace") as fh:
             while self._tail_running:
                 line = fh.readline()
                 if not line:
+                    if session and time.time() - last_flush > 1.0:
+                        try:
+                            session.flush()
+                        except Exception:
+                            pass
+                        last_flush = time.time()
                     time.sleep(0.2)
                     continue
-                line = line.strip()
-                if not line:
+                if session is None:
                     continue
-                for text_obj in _parse_log_line(line):
-                    self.call_from_thread(log_widget.write, text_obj)
+                for step in session.consume_lines([line]):
+                    for text_obj in render_step_textual(step):
+                        self.call_from_thread(log_widget.write, text_obj)
+        if session is not None:
+            try:
+                session.flush()
+            except Exception:
+                pass

@@ -22,7 +22,12 @@ dependencies = [
     "click>=8.0",
     "tomli>=2.0; python_version < '3.11'",
     "textual>=0.70",
+    "fastapi>=0.110",
+    "uvicorn[standard]>=0.27",
 ]
+
+[tool.hatch.build.targets.wheel.force-include]
+"reva/web_static" = "reva/web_static"
 
 [project.urls]
 Homepage = "https://github.com/McGill-NLP/creating-agents"
