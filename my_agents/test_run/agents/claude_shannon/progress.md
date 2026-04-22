@@ -118,4 +118,50 @@ All 100 BigBangTest papers reviewed, committed to GitHub, and submitted to Coale
 
 | 104 | 641e0c7a-f6db-49ae-b123-64c1a10e0a8d | Influence Functions for Scalable Data Attribution in Diffusion Models | ✅ | 7 |
 
-Last updated: 2026-04-22 (104/300 complete — working through new batch)
+## Duplicate Papers (same paper, different ID — comment+vote+verdict submitted pointing to original review)
+
+| # | New ID | Original ID | Title | Status | Score |
+|---|--------|-------------|-------|--------|-------|
+| 105 | cdf80b93-c290-4186-8253-41c2a357839c | 2c1f60ae | Faster Cascades via Speculative Decoding | ✅ | 7 |
+| 106 | 3175e964-be51-4b37-b377-8ae9c5dd0631 | 4cf10f52 | Cybench | ✅ | 7 |
+| 107 | c9a39b60-703c-47cb-ad1f-0591ef42961d | 375ccee5 | On the Benefits of Memory | ✅ | 7 |
+| 108 | 35c1a11f-f39b-4655-ac65-3121dfc89b8b | 0ab289cb | Training on the Test Task | ✅ | 8 |
+| 109 | e68a18dc-519e-44ec-abaa-96852e7325f8 | bb88f7db | Do I Know This Entity | ✅ | 8 |
+| 110 | b4aa1805-50f6-4a21-b1b1-7ee675186f2e | 38283bbb | SymmetricDiffusers | ✅ | 7 |
+| 111 | b871c6da-045e-48df-9d50-00d5872f7a6f | 16ad3e78 | From Exploration to Mastery | ✅ | 7 |
+| 112 | dd5e1e1a-7219-489f-97e0-dcfd8f3d4f75 | 0a6c4af9 | Context-Parametric Inversion | ✅ | 8 |
+| 113 | 95b49a3b-12ae-4966-ba70-7e79ad1ad4fc | 1f2cb008 | Emergence of meta-stable clustering | ✅ | 6 |
+| 114 | 674a3fb1-d7a0-4b29-b936-9999db38b57c | 18ff4a00 | Do LLMs Recognize Your Preferences | ✅ | 6 |
+| 115 | cec313d1-d755-4ca2-be8d-02c323b306bf | 61dc185c | Standard Gaussian Process | ✅ | 7 |
+| 116 | 32112b5c-6801-47bb-bb99-63805fee25d9 | 6379e1c5 | MLE-bench | ✅ | 8 |
+| 117 | 35f19981-dda9-4b22-9681-cea3b079bed8 | 34d521f2 | Learning single-neuron invariance manifolds | ✅ | 7 |
+| 118 | efe80f89-bb8f-423f-becc-f5e9c537ee0f | 40a9a853 | ReGenesis | ✅ | 6 |
+| 119 | 7de06388-66bc-4d47-add3-a044dc96726e | 60086a82 | Simplifying Consistency Models | ✅ | 7 |
+| 120 | b6fd2e53-6a35-4353-af7a-ed0a22969914 | a02787f2 | Two-Team Polymatrix Games | ✅ | 7 |
+| 121 | 4d8b1052-3cc0-43b7-86ea-58be1fa8b4e2 | 9711ad4f | Booster | ✅ | 6 |
+| 122 | 15e9bd9d-78a6-45f2-8285-5ebcdfbcb212 | 24d89a01 | MoE++ | ✅ | 7 |
+| 123 | 205e99e0-be14-41a4-9c4b-e9702f87c29b | ae9e69ba | DSPO | ✅ | 6 |
+| 124 | acb1988b-f82e-4136-9b85-ba2db3664a54 | 760cf368 | Cut Your Losses | ✅ | 8 |
+| 125 | 43cbfe0c-8084-4882-a031-df27101013ac | 8ff25854 | Instant Policy | ✅ | 7 |
+| 126 | 655559ef-1584-4574-9b70-1881ace272ed | be679164 | Trust or Escalate | ✅ | 7 |
+| 127 | 1e90d2fa-4cf7-467b-a9ad-74f007007084 | cfb42cbd | Cross-Entropy | ✅ | 7 |
+| 128 | aae922ef-8689-4650-bc9a-6383117a9941 | aa02e945 | Toward Guidance-Free AR | ✅ | 6 |
+| 129 | 69348f16-8594-4329-86c5-96f245140cda | 981fc793 | GeSubNet | ✅ | 6 |
+| 130 | 8f5b9147-8405-4169-803b-a45af9daca17 | beece706 | WizardMath | ✅ | 6 |
+| 131 | 47045b07-b3d1-497f-bd0e-135df0d260de | 76470036 | Proteina | ✅ | 7 |
+| 132 | 2766ec7a-49eb-4cf7-9d8f-d25d88d19762 | 017786e8 | Holder Stability GNN | ✅ | 7 |
+| 133 | 8b5d5227-3fe2-4591-aa12-70d43513817c | 4ab92adc | GNN Expressiveness | ✅ | 7 |
+| 134 | ce966705-a35e-44ac-b911-a8da91d4411a | c02bb063 | Combatting Dimensional Collapse | ✅ | 6 |
+| 135 | aa40b9ff-47ad-42b4-b3da-8fdb5fc8b079 | b1ef7611 | Navigating Digital World | ✅ | 7 |
+| 136 | 5f1c1fa0-2fec-4165-8590-b0da987c7501 | b1e376a1 | LaMPlace | ✅ | 6 |
+| 137 | 341a37c4-f9e2-43c4-b6cc-71994ae6811f | a769acad | Spread Preference Annotation | ✅ | 6 |
+| 138 | 6047fd83-4a2b-4446-97c4-df4ba37e6de0 | dc0831ec | Transformers Parity | ✅ | 7 |
+| 139 | e57b0629-399a-46e1-8a20-5fcc649201d2 | 975a80ac | MoDeGPT | ✅ | 7 |
+| 140 | 4866f85f-77cc-4550-9583-98d7972eec01 | 60f34efe | LinOSS | ✅ | 7 |
+| 141 | 73e8233e-1fd6-4b25-bed8-0f13d7394eb5 | 641e0c7a | Influence Functions Diffusion | ✅ | 7 |
+| 142 | 94d4ea20-1dd9-4019-840e-3a47fdf23da5 | 2c1f60ae | Faster Cascades (2nd dup) | ✅ | 7 |
+| 143 | 5f671e7e-1c63-4124-8498-4ff4b385adbc | 8cebc6ca | REGENT | ✅ | 7 |
+| 144 | d5994a77-5760-43d5-b36a-b1bfb0f0c469 | bd905a52 | High-Dynamic Radar | ✅ | 5 |
+| 145 | 1053f820-cee5-457d-a3f7-b6890eb4b133 | 0de7202a | miniCTX | ✅ | 7 |
+
+Last updated: 2026-04-22 (145/300 complete — 41 duplicates processed, starting 155 new papers)
