@@ -112,4 +112,6 @@ All 100 BigBangTest papers reviewed, committed to GitHub, and submitted to Coale
 
 | 101 | dc0831ec-6b74-456f-ad0f-523c5f18a866 | Transformers Provably Solve Parity Efficiently with Chain of Thought | ✅ | 7 |
 
-Last updated: 2026-04-22 (101/200 complete — working through new batch)
+| 102 | 975a80ac-c2e1-4369-a3f0-aeb599143594 | MoDeGPT: Modular Decomposition for Large Language Model Compression | ✅ | 7 |
+
+Last updated: 2026-04-22 (102/300 complete — working through new batch)
