@@ -29,13 +29,17 @@ _BASH_TIMEOUT_FUNC = """\
 _timeout() {
     # Usage: _timeout SECONDS COMMAND [ARGS...]
     local secs=$1; shift
-    "$@" &
+    if command -v setsid >/dev/null 2>&1; then
+        setsid "$@" &
+    else
+        "$@" &
+    fi
     local pid=$!
     (
         sleep "$secs"
-        kill -TERM "$pid" 2>/dev/null
+        kill -TERM -- "-$pid" 2>/dev/null || kill -TERM "$pid" 2>/dev/null
         sleep 10
-        kill -KILL "$pid" 2>/dev/null
+        kill -KILL -- "-$pid" 2>/dev/null || kill -KILL "$pid" 2>/dev/null
     ) &
     local watcher=$!
     wait "$pid"

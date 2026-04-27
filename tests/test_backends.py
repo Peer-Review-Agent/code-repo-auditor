@@ -1,7 +1,7 @@
 """Tests for reva.backends — backend registry and command templates."""
 import pytest
 
-from reva.backends import BACKEND_CHOICES, Backend, get_backend
+from reva.backends import BACKEND_CHOICES, DEFAULT_GEMINI_MODEL, Backend, LOG_REDACTION_PIPE, get_backend
 
 
 EXPECTED_BACKENDS = {"claude-code", "gemini-cli", "codex", "aider", "opencode"}
@@ -37,6 +37,13 @@ def test_command_template_tees_to_agent_log(name):
     log viewer and resume logic have something to read."""
     b = get_backend(name)
     assert "tee -a agent.log" in b.command_template
+
+
+@pytest.mark.parametrize("name", sorted(EXPECTED_BACKENDS))
+def test_command_template_redacts_koala_api_keys_before_logging(name):
+    b = get_backend(name)
+    assert LOG_REDACTION_PIPE in b.command_template
+    assert "reva.redact_stream" in b.command_template
 
 
 @pytest.mark.parametrize("name", sorted(EXPECTED_BACKENDS))
@@ -95,21 +102,23 @@ def test_claude_code_resume_preserves_mcp_config():
     assert "paperlantern" in b.resume_command_template
 
 
-def test_opencode_resume_command_passes_prompt():
-    """Regression: `opencode run --session` without a message has no task to
-    perform in headless mode — same failure mode as codex resume without a
-    prompt. The resume path must re-send the initial prompt."""
+def test_opencode_resume_is_disabled():
+    """OpenCode latest-session lookup can cross agent dirs in multi-agent runs."""
     b = get_backend("opencode")
-    assert b.resume_command_template is not None
-    assert 'initial_prompt.txt' in b.resume_command_template
+    assert b.resume_command_template is None
+    assert b.session_id_extractor is None
 
 
-def test_opencode_has_session_id_extractor():
-    """opencode doesn't emit session IDs in a claude-style JSON log, so it
-    ships a custom shell extractor. Missing extractor → broken resume."""
+def test_opencode_forces_runtime_working_directory():
     b = get_backend("opencode")
-    assert b.session_id_extractor is not None
-    assert "opencode session list" in b.session_id_extractor
+    assert '--dir "$PWD"' in b.command_template
+
+
+def test_opencode_model_is_env_swappable():
+    b = get_backend("opencode")
+    rendered = b.command_template.format(prompt="x")
+    assert '--model "${OPENCODE_MODEL:-opencode-go/deepseek-v4-pro}"' in rendered
+    assert '--variant "${OPENCODE_VARIANT:-max}"' in rendered
 
 
 def test_command_template_uses_cat_for_prompt():
@@ -131,3 +140,11 @@ def test_gemini_cli_uses_skip_trust():
         "gemini-cli backend must pass --skip-trust or headless runs crash-loop "
         "on every recent version of the CLI"
     )
+
+
+def test_gemini_cli_defaults_to_gemini_31_pro_preview_with_env_override():
+    b = get_backend("gemini-cli")
+    assert "--model" in b.command_template
+    assert DEFAULT_GEMINI_MODEL == "gemini-3.1-pro-preview"
+    assert f"{{{{GEMINI_MODEL:-{DEFAULT_GEMINI_MODEL}}}}}" in b.command_template
+    assert f"${{GEMINI_MODEL:-{DEFAULT_GEMINI_MODEL}}}" in b.command_template.format(prompt="x")

@@ -4,6 +4,11 @@ from dataclasses import dataclass
 
 from reva.env import koala_base_url
 
+DEFAULT_GEMINI_MODEL = "gemini-3.1-pro-preview"
+LOG_REDACTION_PIPE = "| uv run --project ../.. python -m reva.redact_stream | tee -a agent.log"
+DEFAULT_OPENCODE_MODEL = "opencode-go/deepseek-v4-pro"
+DEFAULT_OPENCODE_VARIANT = "max"
+
 # Paper Lantern MCP server config, inlined into the claude-code command template.
 # The JSON is wrapped in single quotes at the shell level so its internal double
 # quotes pass through unchanged; `\'` escapes the single quotes inside the Python
@@ -25,6 +30,17 @@ def _codex_koala_mcp_config() -> str:
     )
 
 
+def _gemini_model_arg() -> str:
+    return f'--model "${{{{GEMINI_MODEL:-{DEFAULT_GEMINI_MODEL}}}}}"'
+
+
+def _opencode_model_arg() -> str:
+    return (
+        f'--model "${{{{OPENCODE_MODEL:-{DEFAULT_OPENCODE_MODEL}}}}}" '
+        f'--variant "${{{{OPENCODE_VARIANT:-{DEFAULT_OPENCODE_VARIANT}}}}}"'
+    )
+
+
 @dataclass(frozen=True)
 class Backend:
     name: str
@@ -40,6 +56,8 @@ class Backend:
 
 def _build_backends() -> dict[str, Backend]:
     codex_mcp = _codex_koala_mcp_config()
+    gemini_model = _gemini_model_arg()
+    opencode_model = _opencode_model_arg()
     return {
         "claude-code": Backend(
             name="claude-code",
@@ -49,7 +67,7 @@ def _build_backends() -> dict[str, Backend]:
                 " --dangerously-skip-permissions"
                 " --output-format stream-json --verbose"
                 f" --mcp-config {_PAPER_LANTERN_MCP_CONFIG}"
-                " 2>&1 | tee -a agent.log"
+                f" 2>&1 {LOG_REDACTION_PIPE}"
             ),
             # session_id parsed from stream-json log by tmux.py (_EXTRACT_SESSION_ID_FROM_LOG).
             # --mcp-config must be re-passed on resume: it is a runtime flag, not
@@ -59,7 +77,7 @@ def _build_backends() -> dict[str, Backend]:
                 " --dangerously-skip-permissions"
                 " --output-format stream-json --verbose"
                 f" --mcp-config {_PAPER_LANTERN_MCP_CONFIG}"
-                " 2>&1 | tee -a agent.log"
+                f" 2>&1 {LOG_REDACTION_PIPE}"
             ),
         ),
         "gemini-cli": Backend(
@@ -72,7 +90,10 @@ def _build_backends() -> dict[str, Backend]:
             # reva agent dir. Without the flag the backend exits immediately
             # with "not running in a trusted directory" and the restart loop
             # spins.
-            command_template='gemini --yolo --skip-trust -p "$(cat initial_prompt.txt)" 2>&1 | tee -a agent.log',
+            command_template=(
+                f'gemini --yolo --skip-trust {gemini_model} '
+                f'-p "$(cat initial_prompt.txt)" 2>&1 {LOG_REDACTION_PIPE}'
+            ),
         ),
         "codex": Backend(
             name="codex",
@@ -82,7 +103,7 @@ def _build_backends() -> dict[str, Backend]:
                 f" {codex_mcp}"
                 " --skip-git-repo-check"
                 ' --dangerously-bypass-approvals-and-sandbox "$(cat initial_prompt.txt)"'
-                " 2>&1 | tee -a agent.log"
+                f" 2>&1 {LOG_REDACTION_PIPE}"
             ),
             # --last resumes the most recent session in the current working directory.
             # Re-send the initial work loop prompt so non-interactive resume has a task
@@ -92,7 +113,7 @@ def _build_backends() -> dict[str, Backend]:
                 f" {codex_mcp}"
                 " --last --skip-git-repo-check"
                 ' --dangerously-bypass-approvals-and-sandbox "$(cat initial_prompt.txt)"'
-                " 2>&1 | tee -a agent.log"
+                f" 2>&1 {LOG_REDACTION_PIPE}"
             ),
         ),
         "aider": Backend(
@@ -100,23 +121,15 @@ def _build_backends() -> dict[str, Backend]:
             prompt_filename="AIDER.md",
             # aider auto-persists chat history in .aider.chat.history.md; no
             # explicit resume needed — context is available on every restart.
-            command_template='aider --yes --message "$(cat initial_prompt.txt)" 2>&1 | tee -a agent.log',
+            command_template=f'aider --yes --message "$(cat initial_prompt.txt)" 2>&1 {LOG_REDACTION_PIPE}',
         ),
         "opencode": Backend(
             name="opencode",
             prompt_filename="OPENCODE.md",
-            command_template='opencode run --dangerously-skip-permissions "$(cat initial_prompt.txt)" 2>&1 | tee -a agent.log',
-            # Re-send the initial work loop prompt so non-interactive resume has
-            # a task to perform instead of falling back to interactive behavior
-            # (same reasoning as the codex resume above).
-            resume_command_template=(
-                'opencode run --session "$SESSION_ID" --dangerously-skip-permissions'
-                ' "$(cat initial_prompt.txt)" 2>&1 | tee -a agent.log'
-            ),
-            session_id_extractor=(
-                'opencode session list --format json -n 1 2>/dev/null'
-                ' | python3 -c "import sys,json; d=json.load(sys.stdin); print(d[0][\'id\'] if d else \'\')"'
-            ),
+            command_template=f'opencode run --dir "$PWD" {opencode_model} --dangerously-skip-permissions "$(cat initial_prompt.txt)" 2>&1 {LOG_REDACTION_PIPE}',
+            # Do not resume OpenCode sessions. `opencode session list -n 1`
+            # is not scoped tightly enough to the agent directory and can
+            # resume a sibling agent's latest session in multi-agent runs.
         ),
     }
 

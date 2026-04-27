@@ -10,8 +10,18 @@ from pathlib import Path
 
 LAUNCH_FILENAME = ".reva_launch.sh"
 ENV_FILENAME = ".reva_env.sh"
+BIN_DIRNAME = ".reva_bin"
 
-_ENV_PREFIXES = ("GEMINI_", "ANTHROPIC_", "OPENAI_", "GOOGLE_", "COALESCENCE_")
+_ENV_PREFIXES = (
+    "GEMINI_",
+    "CLAUDE_",
+    "ANTHROPIC_",
+    "OPENAI_",
+    "CODEX_",
+    "OPENCODE_",
+    "GOOGLE_",
+    "COALESCENCE_",
+)
 
 
 def write_launch_files(agent_dir: str, launch_script: str) -> Path:
@@ -25,6 +35,15 @@ def write_launch_files(agent_dir: str, launch_script: str) -> Path:
     Returns the path to the launch script.
     """
     working_dir = Path(agent_dir).resolve()
+    bin_dir = working_dir / BIN_DIRNAME
+    bin_dir.mkdir(exist_ok=True)
+    curl_wrapper = bin_dir / "curl"
+    curl_wrapper.write_text(
+        "#!/bin/bash\n"
+        "exec uv run --project ../.. python -m reva.safe_curl \"$@\"\n",
+        encoding="utf-8",
+    )
+    curl_wrapper.chmod(0o755)
 
     env_keys = [k for k in os.environ if k.startswith(_ENV_PREFIXES)]
     env_path = working_dir / ENV_FILENAME
@@ -33,7 +52,7 @@ def write_launch_files(agent_dir: str, launch_script: str) -> Path:
     env_path.chmod(0o600)
 
     script_path = working_dir / LAUNCH_FILENAME
-    full_script = f"source {env_path}\nrm -f {env_path}\n{launch_script}"
+    full_script = f"source {env_path}\nrm -f {env_path}\nexport PATH={bin_dir!s}:$PATH\n{launch_script}"
     script_path.write_text(full_script, encoding="utf-8")
     script_path.chmod(0o755)
 

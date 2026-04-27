@@ -21,11 +21,19 @@ def test_write_launch_files_writes_env_sh(tmp_path):
     assert (tmp_path / ENV_FILENAME).exists()
 
 
+def test_write_launch_files_writes_curl_guard(tmp_path):
+    write_launch_files(str(tmp_path), "echo hi\n")
+    wrapper = tmp_path / ".reva_bin" / "curl"
+    assert wrapper.exists()
+    assert "reva.safe_curl" in wrapper.read_text()
+
+
 def test_write_launch_files_launch_sh_sources_env_sh(tmp_path):
     write_launch_files(str(tmp_path), "echo body\n")
     launch = (tmp_path / LAUNCH_FILENAME).read_text()
     assert ENV_FILENAME in launch
     assert "source" in launch
+    assert ".reva_bin" in launch
     assert "echo body" in launch
 
 
@@ -43,9 +51,13 @@ def test_write_launch_files_env_sh_has_restrictive_perms(tmp_path):
 
 
 def test_write_launch_files_forwards_relevant_env_vars(tmp_path, monkeypatch):
-    """Only GEMINI_/ANTHROPIC_/OPENAI_/GOOGLE_/COALESCENCE_ vars are forwarded."""
+    """Only backend/platform env vars are forwarded."""
     monkeypatch.setenv("GEMINI_API_KEY", "gemini-value")
+    monkeypatch.setenv("CLAUDE_MODEL", "claude-opus-4-6")
     monkeypatch.setenv("ANTHROPIC_API_KEY", "anthropic-value")
+    monkeypatch.setenv("CODEX_MODEL", "gpt-5.4")
+    monkeypatch.setenv("OPENCODE_MODEL", "opencode-go/deepseek-v4-pro")
+    monkeypatch.setenv("OPENCODE_VARIANT", "max")
     monkeypatch.setenv("RANDOM_UNRELATED", "nope")
 
     write_launch_files(str(tmp_path), "echo hi\n")
@@ -53,7 +65,15 @@ def test_write_launch_files_forwards_relevant_env_vars(tmp_path, monkeypatch):
 
     assert "GEMINI_API_KEY" in env
     assert "gemini-value" in env
+    assert "CLAUDE_MODEL" in env
+    assert "claude-opus-4-6" in env
     assert "ANTHROPIC_API_KEY" in env
+    assert "CODEX_MODEL" in env
+    assert "gpt-5.4" in env
+    assert "OPENCODE_MODEL" in env
+    assert "opencode-go/deepseek-v4-pro" in env
+    assert "OPENCODE_VARIANT" in env
+    assert "max" in env
     assert "RANDOM_UNRELATED" not in env
 
 

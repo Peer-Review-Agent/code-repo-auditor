@@ -5,6 +5,9 @@ hits wall time, SLURM sends SIGTERM, the EXIT trap fires, and a successor
 job is queued (unless a .reva_stop sentinel is present or the max-chain cap
 has been reached). See .claude/specs/cluster-slurm-support.md for the
 design rationale.
+
+Optional: set REVA_SLACK_WEBHOOK_URL to a Slack Incoming Webhook before
+`reva launch --cluster` to get a message when each job segment exits.
 """
 
 import re
@@ -26,7 +29,8 @@ _TIME_RE = re.compile(r"^(\d+-)?\d{1,2}:\d{2}(:\d{2})?$")
 _SBATCH_TEMPLATE = """\
 #!/bin/bash
 #SBATCH --job-name={job_name}
-#SBATCH --partition={partition}
+{partition_line}\
+{account_line}\
 #SBATCH --time={time}
 #SBATCH --cpus-per-task={cpus}
 #SBATCH --mem={mem}
@@ -34,6 +38,30 @@ _SBATCH_TEMPLATE = """\
 #SBATCH --error={agent_dir}/cluster.%j.err
 
 cd {agent_dir}
+source /etc/profile >/dev/null 2>&1 || true
+if command -v module >/dev/null 2>&1; then
+    module load python/3.11 nodejs >/dev/null 2>&1 || true
+fi
+if [ -n "$SCRATCH" ]; then
+    export PATH="$SCRATCH/bin:$SCRATCH/npm-global/bin:$PATH"
+    export UV_CACHE_DIR="${{UV_CACHE_DIR:-$SCRATCH/uv-cache}}"
+    export PIP_CACHE_DIR="${{PIP_CACHE_DIR:-$SCRATCH/pip-cache}}"
+    export TMPDIR="${{TMPDIR:-$SCRATCH/tmp}}"
+fi
+# Set REVA_SLACK_WEBHOOK_URL in the shell before `reva launch --cluster` to
+# receive an Incoming-Webhook post when each SLURM job segment ends (and whether
+# a successor was queued). Unset = no notification.
+_reva_slack_notify() {{
+    [ -n "${{REVA_SLACK_WEBHOOK_URL:-}}" ] || return 0
+    if ! command -v python3 >/dev/null 2>&1; then
+        return 0
+    fi
+    local _job_exit="${{1:-0}}" _chained="${{2:-0}}" _h _msg _payload
+    _h=$(hostname 2>/dev/null || echo unknown)
+    _msg=$(printf 'reva SLURM job %s (id %s) on %s - exit %s, successor_queued=%s' "${{SLURM_JOB_NAME:-reva}}" "${{SLURM_JOB_ID:-?}}" "$_h" "$_job_exit" "$_chained")
+    _payload=$(printf '%s' "$_msg" | python3 -c "import json,sys; print(json.dumps({{'text': sys.stdin.read()}}))") || return 0
+    curl -sS -X POST -H "Content-type: application/json" -d "$_payload" "$REVA_SLACK_WEBHOOK_URL" >/dev/null 2>&1 || true
+}}
 # Only the first link in the chain wipes a stale sentinel from a prior run.
 # Successor jobs (REVA_CHAIN_N set via --export) must preserve it so that
 # cancel_chain's "write sentinel, then scancel" sequence still aborts an
@@ -43,20 +71,30 @@ if [ -z "$REVA_CHAIN_N" ]; then
 fi
 
 _chain_next() {{
+    local _job_exit="${{1:-0}}"
+    local _chained=0
     if [ -f {stop_sentinel} ]; then
         echo "[reva cluster] stop sentinel present, not chaining."
+        _reva_slack_notify "$_job_exit" 0
         return
     fi
     if [ "$REVA_CHAIN_N" -ge "$REVA_MAX_CHAIN" ]; then
         echo "[reva cluster] chain limit reached (${{REVA_CHAIN_N}}/${{REVA_MAX_CHAIN}}), not chaining."
+        _reva_slack_notify "$_job_exit" 0
         return
     fi
     NEXT=$((REVA_CHAIN_N + 1))
-    sbatch --dependency=afterany:$SLURM_JOB_ID \\
+    if sbatch --dependency=afterany:$SLURM_JOB_ID \\
         --export=ALL,REVA_CHAIN_N=$NEXT,REVA_MAX_CHAIN=$REVA_MAX_CHAIN \\
         {agent_dir}/{sbatch_filename}
+    then
+        _chained=1
+    else
+        echo "[reva cluster] sbatch failed, successor not queued."
+    fi
+    _reva_slack_notify "$_job_exit" "$_chained"
 }}
-trap _chain_next EXIT
+trap '_chain_next $?' EXIT
 
 REVA_CHAIN_N=${{REVA_CHAIN_N:-1}}
 REVA_MAX_CHAIN=${{REVA_MAX_CHAIN:-{max_chain}}}
@@ -86,6 +124,22 @@ def job_name(agent_name: str) -> str:
     return f"{JOB_NAME_PREFIX}{agent_name}"
 
 
+def _slurm_account_line() -> str:
+    import os
+
+    account = os.environ.get("SLURM_ACCOUNT", "").strip()
+    if not account:
+        return ""
+    return f"#SBATCH --account={account}\n"
+
+
+def _slurm_partition_line(partition: str) -> str:
+    stripped = partition.strip()
+    if not stripped or stripped.lower() == "auto":
+        return ""
+    return f"#SBATCH --partition={stripped}\n"
+
+
 def submit_agent(
     agent_dir: str,
     *,
@@ -112,7 +166,8 @@ def submit_agent(
 
     sbatch_script = _SBATCH_TEMPLATE.format(
         job_name=job_name(agent_name),
-        partition=partition,
+        partition_line=_slurm_partition_line(partition),
+        account_line=_slurm_account_line(),
         time=time,
         cpus=cpus,
         mem=mem,

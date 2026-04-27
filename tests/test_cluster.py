@@ -62,8 +62,78 @@ def test_submit_agent_renders_sbatch_script(tmp_path):
     assert "#SBATCH --error=" in script
     assert "cluster.%j.err" in script
 
+    assert "module load python/3.11 nodejs" in script
+    assert 'export PATH="$SCRATCH/bin:$SCRATCH/npm-global/bin:$PATH"' in script
+
     assert ".reva_launch.sh" in script
-    assert "trap _chain_next EXIT" in script
+    assert "trap '_chain_next $?' EXIT" in script
+    assert "_reva_slack_notify" in script
+    assert "REVA_SLACK_WEBHOOK_URL" in script
+
+
+def test_submit_agent_renders_slurm_account_from_env(tmp_path):
+    agent_dir = tmp_path / "foo"
+    agent_dir.mkdir()
+    (agent_dir / ".reva_launch.sh").write_text("#!/bin/bash\necho hi\n")
+
+    with patch.dict("os.environ", {"SLURM_ACCOUNT": "def-cneary"}), \
+         patch("reva.cluster.shutil.which", return_value="/usr/bin/sbatch"), \
+         patch("reva.cluster.subprocess.run", return_value=_fake_sbatch_success()):
+        submit_agent(
+            str(agent_dir),
+            agent_name="foo",
+            partition="main-cpu",
+            time="5-00:00:00",
+            cpus=4,
+            mem="16G",
+            max_chain=3,
+        )
+
+    script = (agent_dir / SBATCH_FILENAME).read_text()
+    assert "#SBATCH --account=def-cneary" in script
+
+
+def test_submit_agent_omits_partition_for_auto(tmp_path):
+    agent_dir = tmp_path / "foo"
+    agent_dir.mkdir()
+    (agent_dir / ".reva_launch.sh").write_text("#!/bin/bash\necho hi\n")
+
+    with patch("reva.cluster.shutil.which", return_value="/usr/bin/sbatch"), \
+         patch("reva.cluster.subprocess.run", return_value=_fake_sbatch_success()):
+        submit_agent(
+            str(agent_dir),
+            agent_name="foo",
+            partition="auto",
+            time="5-00:00:00",
+            cpus=4,
+            mem="16G",
+            max_chain=3,
+        )
+
+    script = (agent_dir / SBATCH_FILENAME).read_text()
+    assert "#SBATCH --partition=" not in script
+
+
+def test_submit_agent_omits_slurm_account_when_env_missing(tmp_path):
+    agent_dir = tmp_path / "foo"
+    agent_dir.mkdir()
+    (agent_dir / ".reva_launch.sh").write_text("#!/bin/bash\necho hi\n")
+
+    with patch.dict("os.environ", {}, clear=True), \
+         patch("reva.cluster.shutil.which", return_value="/usr/bin/sbatch"), \
+         patch("reva.cluster.subprocess.run", return_value=_fake_sbatch_success()):
+        submit_agent(
+            str(agent_dir),
+            agent_name="foo",
+            partition="main-cpu",
+            time="5-00:00:00",
+            cpus=4,
+            mem="16G",
+            max_chain=3,
+        )
+
+    script = (agent_dir / SBATCH_FILENAME).read_text()
+    assert "#SBATCH --account=" not in script
 
 
 def test_submit_agent_calls_sbatch_with_script_path(tmp_path):

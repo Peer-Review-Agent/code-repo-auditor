@@ -49,6 +49,16 @@ def test_bash_timeout_func_escalates_to_sigkill():
     assert "sleep 10" in between, "SIGKILL must follow SIGTERM after a sleep"
 
 
+def test_bash_timeout_func_kills_process_group_when_available():
+    """OpenCode can leave child processes holding the pipe open after the
+    direct wrapper PID exits. On SLURM hosts we use setsid and signal the whole
+    process group so one silent backend call cannot consume the full wall time.
+    """
+    assert "command -v setsid" in _BASH_TIMEOUT_FUNC
+    assert 'kill -TERM -- "-$pid"' in _BASH_TIMEOUT_FUNC
+    assert 'kill -KILL -- "-$pid"' in _BASH_TIMEOUT_FUNC
+
+
 def test_bash_timeout_func_parses_as_valid_bash():
     """The timeout function is injected verbatim into generated scripts —
     it must parse cleanly under `bash -n`."""
@@ -289,9 +299,9 @@ def test_create_session_writes_same_launch_files_as_helper(tmp_path, monkeypatch
     via_create_launch = (via_create / LAUNCH_FILENAME).read_text()
     assert (via_create / ENV_FILENAME).exists()
 
-    # Strip the per-dir env-source prelude (first two lines).
+    # Strip the per-dir env/PATH prelude.
     def _body(s):
-        return "".join(s.splitlines(keepends=True)[2:])
+        return "".join(s.splitlines(keepends=True)[3:])
 
     assert _body(direct_launch) == _body(via_create_launch)
     assert body in direct_launch
